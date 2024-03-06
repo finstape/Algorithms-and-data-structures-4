@@ -3,6 +3,74 @@ import networkx as nx
 import customtkinter as ctk
 
 
+# Function Traveling Salesman algorithm
+class Traveling_Salesman:
+    def __init__(self, graph_editor):
+        self.graph_editor = graph_editor
+        self.edges = graph_editor.edges
+        self.graph = graph_editor.graph
+        self.length = float("inf")
+        self.traversal = {}
+
+    # Algorithm
+    def method_nearest_neighbor(self):
+        for node in list(self.graph.nodes):
+            visited = [False for _ in list(self.graph.nodes)]
+            visited[node] = True
+            current_node = node
+            traversal = [current_node]
+
+            while len(traversal) < len(list(self.graph.nodes)):
+                nearest_neighbor = None
+                min_distance = float("inf")
+
+                for neighbor in list(self.graph.neighbors(current_node)):
+                    if not visited[neighbor] and self.graph[current_node][neighbor]["weight"] < min_distance:
+                        nearest_neighbor = neighbor
+                        min_distance = self.graph[current_node][neighbor]["weight"]
+
+                if nearest_neighbor is None:
+                    break
+
+                traversal.append(nearest_neighbor)
+                visited[nearest_neighbor] = True
+                current_node = nearest_neighbor
+
+            if traversal[0] in list(self.graph.neighbors(traversal[-1])) and len(traversal) == len(list(self.graph.nodes)):
+                traversal.append(traversal[0])
+                total_length = sum(self.graph[traversal[i]][traversal[i + 1]]["weight"] for i in range(len(traversal) - 1))
+
+                if total_length < self.length:
+                    self.length = total_length
+                    self.traversal = traversal
+
+        result = f"Длина: {self.length}\n\n"
+        for i in range(len(self.traversal) - 1):
+            result += f'{self.traversal[i]} -> {self.traversal[i + 1]} ({self.graph[self.traversal[i]][self.traversal[i + 1]]["weight"]})\n'
+        return result
+
+    # Draw graph with his traversal
+    def view(self, canvas):
+        canvas.clear_graph()
+        for i in range(len(self.traversal) - 1):
+            start_vertex = self.traversal[i]
+            end_vertex = self.traversal[i + 1]
+            start_x, start_y = self.graph_editor.vertices[start_vertex]
+            end_x, end_y = self.graph_editor.vertices[end_vertex]
+            length = ((end_x - start_x) ** 2 + (end_y - start_y) ** 2) ** 0.5
+            arrow_offset = 10
+            sx = start_x + (end_x - start_x) * (arrow_offset / length)
+            sy = start_y + (end_y - start_y) * (arrow_offset / length)
+            ex = end_x - (end_x - start_x) * (arrow_offset / length)
+            ey = end_y - (end_y - start_y) * (arrow_offset / length)
+            canvas.create_line(sx, sy, ex, ey, arrow="last", width=2)
+
+        for vertex, (x, y) in enumerate(self.graph_editor.vertices):
+            canvas.create_oval(x - 10, y - 10, x + 10, y + 10, fill="blue", tags="vertex")
+            canvas.create_text(x, y, text=str(vertex), fill="white", tags="vertex_text")
+
+
+# Class for editing a graph on a canvas
 class GraphEditor(ctk.CTkCanvas):
     def __init__(self, master, interface, **kwargs):
         super().__init__(master, **kwargs)
@@ -14,6 +82,7 @@ class GraphEditor(ctk.CTkCanvas):
         self.graph = nx.DiGraph()
         self.interface = interface
 
+    # Function to handle left-click events on the canvas
     def on_left_click(self, event):
         x, y = event.x, event.y
         self.create_oval(x - 10, y - 10, x + 10, y + 10, fill="blue", tags="vertex")
@@ -21,6 +90,7 @@ class GraphEditor(ctk.CTkCanvas):
         self.vertices.append((x, y))
         self.graph.add_node(len(self.graph))
 
+    # Function to handle right-click events on the canvas
     def on_right_click(self, event):
         x, y = event.x, event.y
         vertex = self.get_clicked_vertex(x, y)
@@ -44,12 +114,14 @@ class GraphEditor(ctk.CTkCanvas):
                 self.selected_vertex = None
                 self.interface.populate_edge_table()
 
+    # Function to get the index of a clicked vertex on the canvas
     def get_clicked_vertex(self, x, y):
         for i, (vx, vy) in enumerate(self.vertices):
             if (x - vx) ** 2 + (y - vy) ** 2 <= 100:
                 return i
         return None
 
+    # Function to clear the graph on the canvas
     def clear_graph(self):
         self.vertices = []
         self.edges = []
@@ -57,6 +129,7 @@ class GraphEditor(ctk.CTkCanvas):
         self.delete("all")
 
 
+# Class for the graphical user interface
 class Interface(ctk.CTk):
     def __init__(self):
         ctk.CTk.__init__(self)
@@ -76,6 +149,7 @@ class Interface(ctk.CTk):
         self.edge_table = {}
         self.create_interface()
 
+    # Function to create the graphical user interface
     def create_interface(self):
         self.frame1 = ctk.CTkFrame(self)
         self.frame1.grid(row=0, column=0, padx=10, pady=10, sticky="n")
@@ -101,6 +175,7 @@ class Interface(ctk.CTk):
 
         self.graph_view = GraphEditor(self.frame2, width=500, height=300, bg="grey", interface=self)
         self.graph_view.pack(side="top", padx=10, pady=10)
+        self.graph_view.bind("<Button-1>", self.prevent_typing)
 
         self.frame3 = ctk.CTkFrame(self)
         self.frame3.grid(row=0, column=2, padx=10, pady=10, sticky="n")
@@ -111,15 +186,18 @@ class Interface(ctk.CTk):
 
         self.populate_edge_table()
 
+    # Function to prevent typing in the output textbox
     def prevent_typing(self, event):
         return "break"
 
+    # Function to clear the output textbox and the graph on the canvas
     def clear_output(self):
         self.graph_editor.clear_graph()
         self.graph_view.clear_graph()
         self.output_text.delete("1.0", ctk.END)
         self.populate_edge_table()
 
+    # Function to populate the edge table with data from the graph
     def populate_edge_table(self):
         if self.edge_table:
             for widgets in self.edge_table.values():
@@ -149,16 +227,25 @@ class Interface(ctk.CTk):
 
             self.edge_table[row] = [entry_vertex1, entry_vertex2, entry_weight]
 
+    # Function to update weights in graph
     def update_weight(self, vertex1, vertex2, entry_weight):
         new_weight = entry_weight.get()
         self.graph_editor.graph[vertex1][vertex2]["weight"] = int(new_weight)
 
+    # Function to run a process in a separate thread
     def threading_run(self):
         t = threading.Thread(target=self.start_process)
         t.start()
 
+    # Placeholder function for starting a process
     def start_process(self):
-        pass
+        self.output_text.delete("1.0", ctk.END)
+        self.graph_view.clear_graph()
+
+        salesman = Traveling_Salesman(self.graph_editor)
+        salesman.method_nearest_neighbor()
+        self.output_text.insert(ctk.END, salesman.method_nearest_neighbor())
+        salesman.view(self.graph_view)
 
 
 # Main block to run the GUI application
