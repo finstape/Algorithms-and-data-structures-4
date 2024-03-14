@@ -136,7 +136,7 @@ class Interface(ctk.CTk):
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
         self.title("Решение задачи о коммивояжере с помощью метода ближайшего соседа")
-        self.geometry("1130x670")
+        self.geometry("1100x670")
         self.frame1 = None
         self.frame2 = None
         self.frame3 = None
@@ -170,10 +170,10 @@ class Interface(ctk.CTk):
         self.frame2 = ctk.CTkFrame(self)
         self.frame2.grid(row=0, column=1, padx=10, pady=10, sticky="n")
 
-        self.graph_editor = GraphEditor(self.frame2, width=500, height=300, bg="grey", interface=self)
+        self.graph_editor = GraphEditor(self.frame2, width=600, height=385, bg="grey", interface=self)
         self.graph_editor.pack(side="top", padx=10, pady=10)
 
-        self.graph_view = GraphEditor(self.frame2, width=500, height=300, bg="grey", interface=self)
+        self.graph_view = GraphEditor(self.frame2, width=600, height=385, bg="grey", interface=self)
         self.graph_view.pack(side="top", padx=10, pady=10)
         self.graph_view.bind("<Button-1>", self.prevent_typing)
 
