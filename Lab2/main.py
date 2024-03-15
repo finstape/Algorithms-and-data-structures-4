@@ -24,32 +24,36 @@ class Traveling_Salesman:
             total += weight
         return total
 
+    # Return neigbor solution and cost
+    def get_neighbor_solution_and_cost(self):
+        for _ in range(30):
+            neighbor_solution = nx.random_spanning_tree(self.graph)
+            neighbor_cost = self.total_weight(list(neighbor_solution.nodes))
+            if neighbor_cost < 10 ** 9:
+                return neighbor_solution, neighbor_cost
+        return None, float("inf")
+
     # Algorithm
-    def simulated_annealing(self, initial_temperature, cooling_rate, num_iterations):
+    def simulated_annealing(self, temperature, cooling_rate, num_iterations):
         previous_solutions = queue.PriorityQueue()
         current_solution = nx.random_spanning_tree(self.graph)
         current_cost = self.total_weight(list(current_solution.nodes))
         traversal = list(current_solution.nodes)
         length = current_cost
-        temperature = initial_temperature
 
-        for _ in range(num_iterations):
-            neighbor_solution = None
-            neighbor_cost = float("inf")
-            for _ in range(30):
-                neighbor_solution = nx.random_spanning_tree(self.graph)
-                neighbor_cost = self.total_weight(list(neighbor_solution.nodes))
-                if neighbor_cost < 10 ** 9:
-                    break
+        for i in range(num_iterations):
+            neighbor_solution, neighbor_cost = self.get_neighbor_solution_and_cost()
             previous_solutions.put((neighbor_cost, random.random(), neighbor_solution))
+
             if neighbor_cost < current_cost:
                 current_solution = neighbor_solution
                 current_cost = neighbor_cost
                 if current_cost < length:
                     traversal = list(current_solution.nodes)
                     length = current_cost
+
             if random.random() < math.exp(-(current_cost - neighbor_cost) / temperature):
-                current_cost, __, current_solution = previous_solutions.get()
+                current_cost, _, current_solution = previous_solutions.get()
             temperature *= cooling_rate
 
         self.traversal = traversal
@@ -195,7 +199,7 @@ class Interface(ctk.CTk):
 
         self.coeff_freeze = ctk.CTkEntry(self.frame1, width=140)
         self.coeff_freeze.pack(side="top", padx=10)
-        self.coeff_freeze.insert(0, "0.99")
+        self.coeff_freeze.insert(0, "0.9")
 
         self.num_iteration_text = ctk.CTkLabel(self.frame1, text="Количество итераций")
         self.num_iteration_text.pack(side="top", padx=10)
