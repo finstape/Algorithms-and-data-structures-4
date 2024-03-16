@@ -199,7 +199,7 @@ class Interface(ctk.CTk):
 
         self.coeff_freeze = ctk.CTkEntry(self.frame1, width=140)
         self.coeff_freeze.pack(side="top", padx=10)
-        self.coeff_freeze.insert(0, "0.9")
+        self.coeff_freeze.insert(0, "0.99")
 
         self.num_iteration_text = ctk.CTkLabel(self.frame1, text="Количество итераций")
         self.num_iteration_text.pack(side="top", padx=10)
