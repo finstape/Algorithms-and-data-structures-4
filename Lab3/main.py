@@ -1,5 +1,3 @@
-import math
-import queue
 import random
 import threading
 import networkx as nx
@@ -15,46 +13,76 @@ class Traveling_Salesman:
         self.length = float("inf")
         self.traversal = {}
 
-    # Function to calculate total weight of traversal
-    def total_weight(self, traversal):
-        total = 0
-        for i in range(len(traversal) - 1):
-            edge_data = self.graph.get_edge_data(traversal[i], traversal[i + 1])
-            weight = edge_data["weight"] if edge_data else float("inf")
-            total += weight
-        return total
-
-    # Return neigbor solution and cost
-    def get_neighbor_solution_and_cost(self):
-        for _ in range(30):
-            neighbor_solution = nx.random_spanning_tree(self.graph)
-            neighbor_cost = self.total_weight(list(neighbor_solution.nodes))
-            if neighbor_cost < 10 ** 9:
-                return neighbor_solution, neighbor_cost
-        return None, float("inf")
-
     # Algorithm
-    def simulated_annealing(self, temperature, cooling_rate, num_iterations):
-        previous_solutions = queue.PriorityQueue()
-        current_solution = nx.random_spanning_tree(self.graph)
-        current_cost = self.total_weight(list(current_solution.nodes))
-        traversal = list(current_solution.nodes)
-        length = current_cost
+    def ant_algo(self, coeff_feromon, coeff_length, count_feromon, evaporation_rate, elite_ants_count=1, elite_pheromone_factor=2):
+        num_nodes = self.graph.number_of_nodes()
+        traversal = None
+        length = float("inf")
+        pheromone = {(edge[0], edge[1]): 1 for edge in self.graph.edges()}
 
-        for i in range(num_iterations):
-            neighbor_solution, neighbor_cost = self.get_neighbor_solution_and_cost()
-            previous_solutions.put((neighbor_cost, random.random(), neighbor_solution))
+        for _ in range(count_feromon * 5):
+            elite_traversals = []
+            elite_lengths = []
 
-            if neighbor_cost < current_cost:
-                current_solution = neighbor_solution
-                current_cost = neighbor_cost
-                if current_cost < length:
-                    traversal = list(current_solution.nodes)
-                    length = current_cost
+            for ant in range(num_nodes):
+                current_node = random.choice(list(self.graph.nodes()))
+                visited_nodes = [current_node]
+                path_length = 0
 
-            if random.random() < math.exp(-(current_cost - neighbor_cost) / temperature):
-                current_cost, _, current_solution = previous_solutions.get()
-            temperature *= cooling_rate
+                while len(visited_nodes) < num_nodes:
+                    unvisited_nodes = set(self.graph.nodes()) - set(visited_nodes)
+                    probabilities = []
+                    total_probability = 0
+
+                    for neighbor in unvisited_nodes:
+                        if (current_node, neighbor) in self.graph.edges():
+                            pheromone_level = pheromone.get((current_node, neighbor), 0.0)
+                            edge_length = self.graph[current_node][neighbor].get("weight", 1.0)
+                            probabilities.append(((pheromone_level ** coeff_feromon) * ((1.0 / edge_length) ** coeff_length), neighbor))
+                            total_probability += probabilities[-1][0]
+
+                    if not probabilities:
+                        break
+
+                    total_probability = total_probability.real
+                    chosen_probability = random.uniform(0, total_probability)
+                    cumulative_probability = 0
+
+                    for probability, neighbor in probabilities:
+                        cumulative_probability += probability.real
+                        if cumulative_probability >= chosen_probability:
+                            break
+
+                    path_length += self.graph[current_node][neighbor].get("weight", 1.0)
+                    visited_nodes.append(neighbor)
+                    current_node = neighbor
+
+                if len(visited_nodes) < num_nodes:
+                    # If the path is incomplete, skip this ant
+                    continue
+
+                if path_length < length:
+                    length = path_length
+                    traversal = visited_nodes
+
+                if ant < elite_ants_count:
+                    elite_traversals.append(visited_nodes)
+                    elite_lengths.append(path_length)
+
+                for i in range(num_nodes - 1):
+                    edge = (visited_nodes[i], visited_nodes[i + 1])
+                    if path_length != 0:
+                        pheromone[edge] = (1 - evaporation_rate) * pheromone.get(edge, 0.0) + count_feromon / path_length
+                    else:
+                        pheromone[edge] = (1 - evaporation_rate) * pheromone.get(edge, 0.0)
+
+            for elite_traversal, elite_length in zip(elite_traversals, elite_lengths):
+                for i in range(num_nodes - 1):
+                    edge = (elite_traversal[i], elite_traversal[i + 1])
+                    pheromone[edge] += elite_pheromone_factor * count_feromon / elite_length
+
+            for edge in self.graph.edges():
+                pheromone[edge] *= (1 - evaporation_rate)
 
         self.traversal = traversal
         self.length = length
@@ -66,9 +94,9 @@ class Traveling_Salesman:
             raise TypeError("Key Error, cycle is not found!")
 
         result = f"Длина: {self.length}\n\n"
-        for i in range(len(traversal) - 1):
+        for i in range(len(self.traversal) - 1):
             result += f'{self.traversal[i]} -> {self.traversal[i + 1]} ({self.graph[self.traversal[i]][self.traversal[i + 1]]["weight"]})\n'
-        return result
+        return result, pheromone
 
     # Draw graph with his traversal
     def view(self, canvas):
@@ -156,8 +184,8 @@ class Interface(ctk.CTk):
         ctk.CTk.__init__(self)
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
-        self.title("Решение задачи о коммивояжере с помощью алгоритма имитации отжига")
-        self.geometry("1100x670")
+        self.title("Решение задачи о коммивояжере с помощью муравьиного алгоритма")
+        self.geometry("1250x670")
         self.frame1 = None
         self.frame2 = None
         self.frame3 = None
@@ -167,12 +195,14 @@ class Interface(ctk.CTk):
         self.graph_editor = None
         self.output_text = None
         self.process_button = None
-        self.num_iteration = None
-        self.num_iteration_text = None
-        self.coeff_freeze = None
-        self.coeff_freeze_text = None
-        self.temperature = None
-        self.temperature_text = None
+        self.evaporation_rate = None
+        self.evaporation_rate_text = None
+        self.count_feromon = None
+        self.count_feromon_text = None
+        self.coeff_length = None
+        self.coeff_length_text = None
+        self.coeff_feromon = None
+        self.coeff_feromon_text = None
         self.edge_table = {}
         self.create_interface()
 
@@ -187,26 +217,33 @@ class Interface(ctk.CTk):
         self.clear_button = ctk.CTkButton(self.frame1, text="Очистить", command=self.clear_output)
         self.clear_button.pack(side="top", padx=10, pady=10)
 
-        self.temperature_text = ctk.CTkLabel(self.frame1, text="Начальная температура")
-        self.temperature_text.pack(side="top", padx=10)
+        self.coeff_feromon_text = ctk.CTkLabel(self.frame1, text="Коэфф. значимости феромона")
+        self.coeff_feromon_text.pack(side="top", padx=10)
 
-        self.temperature = ctk.CTkEntry(self.frame1, width=140)
-        self.temperature.pack(side="top", padx=10)
-        self.temperature.insert(0, "1000")
+        self.coeff_feromon = ctk.CTkEntry(self.frame1, width=140)
+        self.coeff_feromon.pack(side="top", padx=10)
+        self.coeff_feromon.insert(0, "1")
 
-        self.coeff_freeze_text = ctk.CTkLabel(self.frame1, text="Коэфф. охлаждения")
-        self.coeff_freeze_text.pack(side="top", padx=10)
+        self.coeff_length_text = ctk.CTkLabel(self.frame1, text="Коэфф. значимости длины")
+        self.coeff_length_text.pack(side="top", padx=10)
 
-        self.coeff_freeze = ctk.CTkEntry(self.frame1, width=140)
-        self.coeff_freeze.pack(side="top", padx=10)
-        self.coeff_freeze.insert(0, "0.99")
+        self.coeff_length = ctk.CTkEntry(self.frame1, width=140)
+        self.coeff_length.pack(side="top", padx=10)
+        self.coeff_length.insert(0, "1")
 
-        self.num_iteration_text = ctk.CTkLabel(self.frame1, text="Количество итераций")
-        self.num_iteration_text.pack(side="top", padx=10)
+        self.count_feromon_text = ctk.CTkLabel(self.frame1, text="Кол-во доп. феромона")
+        self.count_feromon_text.pack(side="top", padx=10)
 
-        self.num_iteration = ctk.CTkEntry(self.frame1, width=140)
-        self.num_iteration.pack(side="top", padx=10)
-        self.num_iteration.insert(0, "100")
+        self.count_feromon = ctk.CTkEntry(self.frame1, width=140)
+        self.count_feromon.pack(side="top", padx=10)
+        self.count_feromon.insert(0, "100")
+
+        self.evaporation_rate_text = ctk.CTkLabel(self.frame1, text="Интенсивность испарения")
+        self.evaporation_rate_text.pack(side="top", padx=10)
+
+        self.evaporation_rate = ctk.CTkEntry(self.frame1, width=140)
+        self.evaporation_rate.pack(side="top", padx=10)
+        self.evaporation_rate.insert(0, "0.5")
 
         self.answer_label = ctk.CTkLabel(self.frame1, text="Ответ:")
         self.answer_label.pack(side="top", padx=10, fill=ctk.BOTH)
@@ -228,7 +265,7 @@ class Interface(ctk.CTk):
         self.frame3 = ctk.CTkFrame(self)
         self.frame3.grid(row=0, column=2, padx=10, pady=10, sticky="n")
 
-        for col, header in enumerate(["Вершина 1", "Вершина 2", "Вес"]):
+        for col, header in enumerate(["Вершина 1", "Вершина 2", "Вес", "Феромон"]):
             label = ctk.CTkLabel(self.frame3, text=header)
             label.grid(row=0, column=col, padx=30, pady=5)
 
@@ -245,8 +282,33 @@ class Interface(ctk.CTk):
         self.output_text.delete("1.0", ctk.END)
         self.populate_edge_table()
 
+    # Function to update weights in graph
+    def update_weight(self, vertex1, vertex2, entry_weight):
+        new_weight = entry_weight.get()
+        self.graph_editor.graph[vertex1][vertex2]["weight"] = int(new_weight)
+
+    # Function to run a process in a separate thread
+    def threading_run(self):
+        t = threading.Thread(target=self.run_process)
+        t.start()
+
+    # Function to run a process in the main thread
+    def run_process(self):
+        self.output_text.delete("1.0", ctk.END)
+        self.graph_view.clear_graph()
+        self.after(10, self.start_process)
+
+    # Function to start a process
+    def start_process(self):
+        salesman = Traveling_Salesman(self.graph_editor)
+        result, pheromone = salesman.ant_algo(float(self.coeff_feromon.get()), float(self.coeff_length.get()),
+                                                      int(self.count_feromon.get()), float(self.evaporation_rate.get()))
+        self.output_text.insert(ctk.END, result)
+        self.populate_edge_table(pheromone)
+        salesman.view(self.graph_view)
+
     # Function to populate the edge table with data from the graph
-    def populate_edge_table(self):
+    def populate_edge_table(self, pheromone=None):
         if self.edge_table:
             for widgets in self.edge_table.values():
                 for widget in widgets:
@@ -275,25 +337,14 @@ class Interface(ctk.CTk):
 
             self.edge_table[row] = [entry_vertex1, entry_vertex2, entry_weight]
 
-    # Function to update weights in graph
-    def update_weight(self, vertex1, vertex2, entry_weight):
-        new_weight = entry_weight.get()
-        self.graph_editor.graph[vertex1][vertex2]["weight"] = int(new_weight)
+        if pheromone:
+            for row, (vertex1, vertex2, weight) in enumerate(sorted_edges, start=1):
+                entry_pheromone = ctk.CTkEntry(self.frame3, width=100)
+                entry_pheromone.insert(ctk.END, pheromone.get((vertex1, vertex2), 1))
+                entry_pheromone.grid(row=row, column=3, padx=10, pady=5)
+                entry_pheromone.bind("<KeyPress>", self.prevent_typing)
 
-    # Function to run a process in a separate thread
-    def threading_run(self):
-        t = threading.Thread(target=self.start_process)
-        t.start()
-
-    # Placeholder function for starting a process
-    def start_process(self):
-        self.output_text.delete("1.0", ctk.END)
-        self.graph_view.clear_graph()
-
-        salesman = Traveling_Salesman(self.graph_editor)
-        self.output_text.insert(ctk.END, salesman.simulated_annealing(int(self.temperature.get()), float(self.coeff_freeze.get()),
-                                                                      int(self.num_iteration.get())))
-        salesman.view(self.graph_view)
+                self.edge_table[row].append(entry_pheromone)
 
 
 # Main block to run the GUI application
