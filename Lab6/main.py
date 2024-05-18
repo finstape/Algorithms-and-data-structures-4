@@ -29,13 +29,23 @@ class MonteCarloSimulator:
         self.error_label = tk.Label(self.frame, text="")
         self.error_label.grid(row=6, columnspan=2)
 
+        self.canvas = tk.Canvas(self.frame, width=400, height=400, bg='white')
+        self.canvas.grid(row=7, columnspan=2, pady=10)
+
     def monte_carlo_area(self, area, n):
         inside = 0
+        self.canvas.delete("all")
+        self.draw_axes()
         for _ in range(n):
             x = uniform(-2, 2)
             y = uniform(-2, 2)
+            screen_x = 200 + x * 50
+            screen_y = 200 - y * 50
             if area(x, y):
+                self.canvas.create_oval(screen_x - 2, screen_y - 2, screen_x + 2, screen_y + 2, fill='blue', outline='blue')
                 inside += 1
+            else:
+                self.canvas.create_oval(screen_x - 2, screen_y - 2, screen_x + 2, screen_y + 2, fill='red', outline='red')
         return (inside / n) * 16  # S = (K / N) * S0
 
     def monte_carlo_integral(self, func, a, b, n):
@@ -50,6 +60,24 @@ class MonteCarloSimulator:
 
     def func(self, x):
         return x ** 2
+
+    def draw_axes(self):
+        # Draw x-axis
+        self.canvas.create_line(0, 200, 400, 200, fill="black")
+        # Draw y-axis
+        self.canvas.create_line(200, 0, 200, 400, fill="black")
+
+        # Draw ticks on x-axis
+        for i in range(-2, 3):
+            x = 200 + i * 50
+            self.canvas.create_line(x, 195, x, 205, fill="black")
+            self.canvas.create_text(x, 215, text=str(i), fill="black")
+
+        # Draw ticks on y-axis
+        for i in range(-2, 3):
+            y = 200 - i * 50
+            self.canvas.create_line(195, y, 205, y, fill="black")
+            self.canvas.create_text(185, y, text=str(i), fill="black")
 
     def calculate(self):
         try:
