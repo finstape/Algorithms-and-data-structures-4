@@ -48,7 +48,7 @@ class Interface(ctk.CTk):
         self.method_combobox = ctk.CTkComboBox(self, values=["2DCCA Cascade", "2DCCA Parallel", "PLS Cascade", "PLS Parallel"])
         self.method_combobox.grid(row=1, column=1, padx=10, pady=10, sticky="e")
 
-        self.train_button = ctk.CTkButton(self, text="Обучить", command=self.train_model)
+        self.train_button = ctk.CTkButton(self, text="Тренировать", command=self.train_model)
         self.train_button.grid(row=2, column=0, padx=10, pady=10, sticky="w")
 
         self.run_button = ctk.CTkButton(self, text="Запустить", command=self.test_model)
